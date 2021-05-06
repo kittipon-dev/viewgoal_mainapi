@@ -200,7 +200,7 @@ router.get('/startcam', async (req, res) => {
     });
     var config = {
         method: 'post',
-        url: 'http://127.0.0.1:4000/add',
+        url: 'http://52.221.100.148:4000/add',
         headers: {
             'Content-Type': 'application/json'
         },
@@ -222,7 +222,7 @@ router.get('/stopcam', async (req, res) => {
     const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { status: false })
     var config = {
         method: 'get',
-        url: `http://127.0.0.1:4000/stop?dID=${dbCamera.dID}`,
+        url: `http://52.221.100.148:4000/stop?dID=${dbCamera.dID}`,
         headers: {}
     };
     if (dbCamera.dID != "") {
