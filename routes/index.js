@@ -200,38 +200,43 @@ router.get('/startcam', async (req, res) => {
     });
     var config = {
         method: 'post',
-        url: 'http://52.77.11.127:4000/add',
+        url: 'http://127.0.0.1:4000/add',
         headers: {
             'Content-Type': 'application/json'
         },
         data: data
     };
+    if (dbCamera.dID == "" || dbCamera.dID == null) {
+        axios(config)
+            .then(async function (response) {
+                const myobj = JSON.parse(JSON.stringify(response.data))
+                const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { dID: myobj.dID } })
+            })
+            .catch(function (error) {
 
-    axios(config)
-        .then(async function (response) {
-            const myobj = JSON.parse(JSON.stringify(response.data))
-            const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { dID: myobj.dID } })
-        })
-        .catch(function (error) {
-            
-        });
+            });
+    }
     res.end()
 });
 router.get('/stopcam', async (req, res) => {
     const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { status: false })
     var config = {
         method: 'get',
-        url: `http://52.77.11.127:4000/stop?dID=${dbCamera.dID}`,
+        url: `http://127.0.0.1:4000/stop?dID=${dbCamera.dID}`,
         headers: {}
     };
+    if (dbCamera.dID != "") {
+        axios(config)
+            .then(async function (response) {
+                if (response.status == 200) {
+                    const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { dID: "" } })
+                }
+            })
+            .catch(function (error) {
 
-    axios(config)
-        .then(function (response) {
-            
-        })
-        .catch(function (error) {
-            
-        });
+            });
+    }
+
     res.end()
 });
 router.get('/removedcam', async (req, res) => {
