@@ -200,7 +200,7 @@ router.get('/startcam', async (req, res) => {
     });
     var config = {
         method: 'post',
-        url: 'http://52.221.100.148:4000/add',
+        url: 'http://52.77.11.127:4000/add',
         headers: {
             'Content-Type': 'application/json'
         },
@@ -208,11 +208,12 @@ router.get('/startcam', async (req, res) => {
     };
 
     axios(config)
-        .then(function (response) {
-            console.log(JSON.stringify(response.data));
+        .then(async function (response) {
+            const myobj = JSON.parse(JSON.stringify(response.data))
+            const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { dID: myobj.dID } })
         })
         .catch(function (error) {
-            console.log(error);
+            
         });
     res.end()
 });
@@ -220,17 +221,17 @@ router.get('/stopcam', async (req, res) => {
     const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { status: false })
     var config = {
         method: 'get',
-        url: `http://52.221.100.148:4000/stop?idcamre=${dbCamera._id}`,
-        headers: { }
-      };
-      
-      axios(config)
-      .then(function (response) {
-        console.log(JSON.stringify(response.data));
-      })
-      .catch(function (error) {
-        console.log(error);
-      });
+        url: `http://52.77.11.127:4000/stop?dID=${dbCamera.dID}`,
+        headers: {}
+    };
+
+    axios(config)
+        .then(function (response) {
+            
+        })
+        .catch(function (error) {
+            
+        });
     res.end()
 });
 router.get('/removedcam', async (req, res) => {

@@ -10,7 +10,8 @@ const cameraSchema = new Schema({
   timeon:Object,
   status:Boolean,
   view:Number,
-  like:Number
+  like:Number,
+  dID:String
 })
 const cameraModel = mongoose.model('camera', cameraSchema)
 module.exports = cameraModel
