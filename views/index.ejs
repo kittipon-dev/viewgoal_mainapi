@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List - Voler Admin Dashboard</title>
+
+    <link rel="stylesheet" href="assets/css/bootstrap.css">
+
+    <link rel="stylesheet" href="assets/vendors/dragula/dragula.min.css">
+
+    <link rel="stylesheet" href="assets/vendors/perfect-scrollbar/perfect-scrollbar.css">
+    <link rel="stylesheet" href="assets/css/app.css">
+    <link rel="shortcut icon" href="assets/images/favicon.svg" type="image/x-icon">
+    <script>
+        let dd = JSON.parse('<%-JSON.stringify(data)%>')
+    </script>
+</head>
+
+<body>
+    <div id="app">
+        <div id="sidebar" class='active'>
+            <div class="sidebar-wrapper active">
+                <div class="sidebar-header">
+
+                </div>
+                <div class="sidebar-menu">
+                    <ul class="menu">
+
+                        <li class='sidebar-title'>Main Menu</li>
+
+                        <li class="sidebar-item  active">
+                            <a href="/" class='sidebar-link'>
+                                <i data-feather="home" width="20"></i>
+                                <span>New Advertising</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item ">
+                            <a href="/testnotifi" class='sidebar-link'>
+                                <i data-feather="send" width="20"></i>
+                                <span>Test Notifi</span>
+                            </a>
+                        </li>
+
+                    </ul>
+                </div>
+                <button class="sidebar-toggler btn x"><i data-feather="x"></i></button>
+            </div>
+        </div>
+        <div id="main">
+
+            <div class="main-content container-fluid">
+                <div class="page-title">
+                    <div class="row">
+                    </div>
+                </div>
+
+                <!-- Button trigger for basic modal -->
+                <button type="button" class="btn btn-outline-primary block" data-bs-toggle="modal"
+                    data-bs-target="#default">New Advertising
+                </button>
+
+                <br>
+                <br>
+
+                <!--Basic Modal -->
+                <div class="modal fade text-left" id="default" tabindex="-1" role="dialog"
+                    aria-labelledby="myModalLabel1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-scrollable" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="myModalLabel1">Basic Modal</h5>
+                                <button type="button" class="close rounded-pill" data-bs-dismiss="modal"
+                                    aria-label="Close">
+                                    <i data-feather="x"></i>
+                                </button>
+                            </div>
+
+                            <div class="modal-body">
+                                <form class="form form-horizontal" action="/newA" method="post"
+                                    enctype="multipart/form-data">
+                                    <div class="col-md-4">
+                                        <input type="text" id="ref" class="form-control" name="ref" required readonly>
+                                        <script>
+                                            document.getElementById('ref').value = makeid(10)
+                                            function makeid(length) {
+                                                var result = '';
+                                                var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                                                var charactersLength = characters.length;
+                                                for (var i = 0; i < length; i++) {
+                                                    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+                                                }
+                                                return result;
+                                            }
+                                        </script>
+                                    </div>
+                                    <br>
+                                    <br>
+                                    <div class="form-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <label>หัวข้อ</label>
+                                            </div>
+                                            <div class="col-md-8 form-group">
+                                                <input type="text" class="form-control" name="topic" required>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label>รูปปก</label>
+                                            </div>
+                                            <div class="col-lg-6 col-md-12">
+                                                <div class="form-file">
+                                                    <input type="file" class="form-file-input" name="avatar" required>
+                                                </div>
+                                            </div>
+                                            <br>
+                                            <br>
+                                            <div class="col-md-4">
+                                                <label>เนื้อหา</label>
+                                            </div>
+                                            <div class="col-md-8 form-group">
+                                                <textarea name="txt" class="form-control"
+                                                    id="exampleFormControlTextarea1" rows="3"></textarea>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label>ใช้ Point</label>
+                                            </div>
+                                            <div class="col-md-8 form-group">
+                                                <input type="number" class="form-control" name="use_point" required>
+                                            </div>
+                                            <div class="col-sm-12 d-flex justify-content-end">
+                                                <button type="submit" class="btn btn-primary me-1 mb-1"
+                                                    value="upload">Submit</button>
+                                                <button type="reset"
+                                                    class="btn btn-light-secondary me-1 mb-1">Reset</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Basic Tables start -->
+                <div class="row" id="basic-table">
+                    <div class="col-lg-12">
+                        <div class="card">
+
+                            <div class="card-content">
+                                <div class="card-body">
+                                    <!-- Table with outer spacing -->
+                                    <div class="table-responsive">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Ref.</th>
+                                                    <th>หัวเรื่อง</th>
+                                                    <th>รูปปก</th>
+                                                    <th>ใช้ Point</th>
+                                                    <th></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <script>
+                                                    dd.forEach(e => {
+                                                        document.write(`
+                                                            <tr>
+                                                            <td class="text-bold-500">${e.ref}</td>
+                                                            <td>${e.topic}</td>
+                                                            <td class="text-bold-500"><img src="${e.urlimg}" width="100" height="100"></td>
+                                                            <td class="text-bold-500">${e.use_point}</td>
+                                                            <td>
+                                                            <button type="button" class="btn btn-outline-warning" onclick="">แก้ไข</button>
+                                                            <a class="btn btn-outline-danger"
+                                                            href="/del_advertisin?ref=${e.ref}">ลบ</a>
+                                                            </td>
+                                                            </tr>
+                                                            `)
+                                                    });
+                                                </script>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Basic Tables end -->
+
+
+            </div>
+
+        </div>
+    </div>
+    <script src="assets/js/feather-icons/feather.min.js"></script>
+    <script src="assets/vendors/perfect-scrollbar/perfect-scrollbar.min.js"></script>
+    <script src="assets/js/app.js"></script>
+
+    <script src="assets/vendors/dragula/dragula.min.js"></script>
+    <script src="assets/js/pages/widgets.js"></script>
+
+    <script src="assets/js/main.js"></script>
+</body>
+
+</html>

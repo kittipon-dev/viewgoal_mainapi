@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List - Voler Admin Dashboard</title>
+
+    <link rel="stylesheet" href="assets/css/bootstrap.css">
+
+    <link rel="stylesheet" href="assets/vendors/dragula/dragula.min.css">
+
+    <link rel="stylesheet" href="assets/vendors/perfect-scrollbar/perfect-scrollbar.css">
+    <link rel="stylesheet" href="assets/css/app.css">
+    <link rel="shortcut icon" href="assets/images/favicon.svg" type="image/x-icon">
+</head>
+
+<body>
+    <div id="app">
+        <div id="sidebar" class='active'>
+            <div class="sidebar-wrapper active">
+                <div class="sidebar-header">
+
+                </div>
+                <div class="sidebar-menu">
+                    <ul class="menu">
+
+                        <li class='sidebar-title'>Main Menu</li>
+
+                        <li class="sidebar-item ">
+                            <a href="/" class='sidebar-link'>
+                                <i data-feather="home" width="20"></i>
+                                <span>New Advertising</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item  active">
+                            <a href="/testnotifi" class='sidebar-link'>
+                                <i data-feather="send" width="20"></i>
+                                <span>Test Notifi</span>
+                            </a>
+                        </li>
+
+                    </ul>
+                </div>
+                <button class="sidebar-toggler btn x"><i data-feather="x"></i></button>
+            </div>
+        </div>
+        <div id="main">
+
+            <div class="main-content container-fluid">
+                <div class="page-title">
+                    <div class="row">
+                    </div>
+                </div>
+
+                <br>
+                <br>
+
+                <!--Basic Modal -->
+                <div class="modal fade text-left" id="default" tabindex="-1" role="dialog"
+                    aria-labelledby="myModalLabel1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-scrollable" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="myModalLabel1">Basic Modal</h5>
+                                <button type="button" class="close rounded-pill" data-bs-dismiss="modal"
+                                    aria-label="Close">
+                                    <i data-feather="x"></i>
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Basic Tables start -->
+                <div class="row" id="basic-table">
+                    <div class="col-lg-12">
+                        <div class="card">
+
+                            <div class="card-content">
+                                <div class="card-body">
+                                    <form action="/sendtestnotifi" method="get">
+                                        <div class="col-lg-4 mb-1">
+                                            <div class="input-group mb-3">
+                                                <span class="input-group-text" id="basic-addon1">User_ID</span>
+                                                <input type="text" class="form-control" name="user_id"
+                                                    aria-label="Username" aria-describedby="basic-addon1" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-4 mb-1">
+                                            <div class="input-group mb-3">
+                                                <span class="input-group-text" id="basic-addon1">Mes</span>
+                                                <input type="text" class="form-control" name="mes"
+                                                    aria-label="Username" aria-describedby="basic-addon1" required>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-outline-success block">Send Test</button>
+                                    </form> 
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Basic Tables end -->
+
+
+            </div>
+
+        </div>
+    </div>
+    <script src="assets/js/feather-icons/feather.min.js"></script>
+    <script src="assets/vendors/perfect-scrollbar/perfect-scrollbar.min.js"></script>
+    <script src="assets/js/app.js"></script>
+
+    <script src="assets/vendors/dragula/dragula.min.js"></script>
+    <script src="assets/js/pages/widgets.js"></script>
+
+    <script src="assets/js/main.js"></script>
+</body>
+
+</html>
