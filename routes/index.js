@@ -9,6 +9,12 @@ const Comment = require('../models/comment')
 const Refmes = require('../models/refmes')
 const Messenger = require('../models/messenger')
 const Notification = require('../models/notification')
+const Like = require('../models/like')
+const Likeuser = require('../models/likeuser')
+const Save = require('../models/save')
+const Following = require('../models/following')
+const Name = require('../models/name')
+const View = require('../models/view')
 
 
 const https = require('https');
@@ -21,8 +27,9 @@ const fs = require('fs')
 const axios = require('axios');
 
 mongoose.connect('mongodb://localhost:27017/viewgoal', {
-    useNewUrlParser: true,
+    useCreateIndex: true,
     useUnifiedTopology: true,
+    useNewUrlParser: true,
     useFindAndModify: false
 })
 
@@ -31,7 +38,8 @@ const router = express.Router();
 const multer = require('multer')
 const { findOne } = require('../models/advertising')
 
-
+const ipDocker = "192.168.2.14"
+const portDocker = 4000
 
 router.get('/', async function (req, res, next) {
     const dbAdvertising = await Advertising.find({})
@@ -136,6 +144,11 @@ router.post('/login', async (req, res) => {
     }
 });
 
+router.post('/resetpass', async (req, res) => {
+    console.log(req.body);
+    res.end()
+});
+
 router.post('/register', async (req, res) => {
     const dbConfig = await Config.find({})
     const myobj = req.body
@@ -147,11 +160,9 @@ router.post('/register', async (req, res) => {
             user_id: myobj.user_id,
             name: req.body.name,
             birthday: req.body.birthday,
-            following: [],
-            followers: [],
-            like: [],
             point: 0,
-            activity: []
+            followers: 0,
+            like: 0,
         })
         try {
             await dbUser.save()
@@ -160,13 +171,13 @@ router.post('/register', async (req, res) => {
                 { user_id: myobj.user_id - 1 },
                 { user_id: myobj.user_id })
             fs.copyFileSync('./public/images-profile/null.png', './public/images-profile/' + myobj.user_id + '.png')
+            res.send({ login: 1, user_id: dbLoin.user_id })
         } catch (error) {
             res.sendStatus(400)
         }
     }).catch(err => {
         res.sendStatus(400)
     })
-    res.end()
 });
 
 router.post('/addcamera', async (req, res) => {
@@ -189,18 +200,21 @@ router.post('/addcamera', async (req, res) => {
     }
     const dbCamera = new Camera(myobj)
     await dbCamera.save()
+    console.log(dbCamera);
+    fs.copyFileSync('./public/imageVideo/null.jpg', './public/imageVideo/' + dbCamera._id + '.jpg')
     res.end()
 });
 
 router.get('/startcam', async (req, res) => {
-    const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { status: true })
+    console.log(req.query);
+    const dbCamera = await Camera.findById(req.query._id,)
     var data = JSON.stringify({
         "idcamre": dbCamera._id,
         "rtsp": dbCamera.url
     });
     var config = {
         method: 'post',
-        url: 'http://52.221.100.148:4000/add',
+        url: `http://${ipDocker}:${portDocker}/add`,
         headers: {
             'Content-Type': 'application/json'
         },
@@ -210,7 +224,7 @@ router.get('/startcam', async (req, res) => {
         axios(config)
             .then(async function (response) {
                 const myobj = JSON.parse(JSON.stringify(response.data))
-                const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { dID: myobj.dID } })
+                const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { dID: myobj.dID, status: true } })
             })
             .catch(function (error) {
 
@@ -222,12 +236,13 @@ router.get('/stopcam', async (req, res) => {
     const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { status: false })
     var config = {
         method: 'get',
-        url: `http://52.221.100.148:4000/stop?dID=${dbCamera.dID}`,
+        url: `http://${ipDocker}:${portDocker}/stop?idcamre=${dbCamera.dID}`,
         headers: {}
     };
     if (dbCamera.dID != "") {
         axios(config)
             .then(async function (response) {
+                console.log(response.status);
                 if (response.status == 200) {
                     const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { dID: "" } })
                 }
@@ -247,11 +262,17 @@ router.get('/removedcam', async (req, res) => {
 
 
 router.get('/me', async (req, res) => {
+
     const dbUser = await User.findOne({ user_id: req.query.user_id })
     const dbCamera = await Camera.find({ user_id: req.query.user_id })
+    const dbSave = await Save.find({ user_id: req.query.user_id })
+    const dbFollowing = await Following.find({ user_id: req.query.user_id })
+
     const myobj = {
         user: dbUser,
-        camera: dbCamera
+        camera: dbCamera,
+        save: dbSave,
+        following: dbFollowing
     }
     if (dbUser != null) {
         res.send(myobj)
@@ -264,6 +285,7 @@ router.get('/me', async (req, res) => {
 
 router.post('/editprofile', async (req, res) => {
     console.log(req.body);
+    console.log("Asd");
     const dbUser = await User.findOneAndUpdate({
         user_id: req.body.user_id
     }, {
@@ -297,146 +319,124 @@ router.post('/editprofile-upimg', uploadI.single('myFile'), async (req, res, nex
 })
 
 
-router.get('/user', async (req, res) => {
-    const dbUser = await User.findOne({ user_id: req.query.user_id })
-    const dbCamera = await Camera.find({ user_id: req.query.user_id, status: true })
-    const myobj = {
-        user: dbUser,
-        camera: dbCamera
-    }
-    res.send(myobj)
-});
 
 router.get('/addfavorite', async (req, res) => {
-    const dbUser = await User.findOneAndUpdate(
-        { user_id: req.query.user_id },
-        { $push: { favorite: req.query.idcam } },
-        { new: true })
+    const now = dayjs()
+    const dbCamera = await Camera.findById(req.query.idcam)
+    console.log(dbCamera);
+    console.log(req.query.idcam);
+    const dbSave = await Save.findOneAndUpdate({
+        idcam: req.query.idcam,
+        user_id: req.query.user_id,
+    }, {
+        idcam: req.query.idcam,
+        user_id: req.query.user_id,
+        title: dbCamera.title,
+        time: now
+    }, {
+        upsert: true, new: true
+    })
+
     res.end()
 });
 router.get('/removefavorite', async (req, res) => {
-    const dbUser = await User.findOneAndUpdate(
-        { user_id: req.query.user_id },
-        { $pull: { favorite: req.query.idcam } })
+    const dbSave = await Save.findOneAndDelete({
+        idcam: req.query.idcam,
+        user_id: req.query.user_id
+    })
     res.end()
 });
+
 
 router.get('/listplaying', async (req, res) => {
     const dbCamera = await Camera.find({ status: true })
-    const dbUser = await User.findOne({ user_id: req.query.user_id })
-    let camf = []
-    let i = 0
-    try {
-        dbUser.favorite.forEach(element => {
-            dbCamera.forEach(e => {
-                if (e._id == element) {
-                    camf[i] = e
-                    i++
-                }
-            });
-        });
-    } catch (error) {
-
-    }
+    const dbSave = await Save.find({ user_id: req.query.user_id })
     const myobj = {
         listplay: dbCamera,
-        favorite: camf,
-        user: dbUser
+        listSave: dbSave
     }
     res.send(myobj)
 });
+
+
 router.get('/getplay', async (req, res) => {
     const dbCamera = await Camera.findById(req.query._id)
-    let v = false
-    //  try {
-    const dbUser = await User.findOne({ user_id: req.query.user_id })
-    dbUser.view.forEach(element => {
-        if (element == req.query._id) {
-            v = true
-        }
-    });
-    if (v == false) {
-        const dbUser = await User.findOneAndUpdate(
-            { user_id: req.query.user_id },
-            { $push: { view: req.query._id } },
-            { new: true })
-        const dbCameraSave = await Camera.findByIdAndUpdate(
-            req.query._id,
-            { $set: { view: dbCamera.view + 1 } }
-        )
+    const dbLikeS = await Like.findOne({ user_id: req.query.user_id, idcam: req.query._id })
+    const dbSave = await Save.findOne({ user_id: req.query.user_id, idcam: req.query._id })
+    const dbView = await View.findOne({ idcam: req.query._id, user_id: req.query.user_id })
+    if (!dbView) {
+        const now = dayjs()
+        const dbView2 = await View.findOneAndUpdate({
+            idcam: req.query._id,
+            user_id: req.query.user_id
+        }, {
+            idcam: req.query._id,
+            user_id: req.query.user_id,
+            time: now
+        }, {
+            upsert: true, new: true
+        })
+        const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $inc: { view: +1 } })
     }
-    /*
-  } catch (error) {
-  
-  }
-  */
-    res.send(dbCamera)
+    const myobj = {
+        Camera: dbCamera,
+        sLike: dbLikeS != null ? true : false,
+        sSave: dbSave != null ? true : false
+    }
+    res.send(myobj)
 });
 
 router.get('/like', async (req, res) => {
-    const now = dayjs()
-    const dbUser = await User.findOne({ user_id: req.query.t_user_id })
-    let l = false
     try {
-        dbUser.like.forEach(element => {
-            if (element == req.query.idcam) {
-                l = false
-            }
-        });
-        if (l == false) {
-            const dbUser = await User.findOneAndUpdate(
-                { user_id: req.query.t_user_id },
-                { $push: { like: req.query.idcam } },
-                { new: true })
-            const dbCamera = await Camera.findById(req.query.idcam)
-            const dbCameraSave = await Camera.findByIdAndUpdate(
-                req.query.idcam,
-                { $set: { like: dbCamera.like + 1 } }
-            )
-        }
-        const dbNotification = await Notification.findOneAndUpdate(
-            {
-                type: "like",
-                t_user_id: req.query.t_user_id,
-                r_user_id: req.query.r_user_id,
-                refid: req.query.idcam
-            },
-            {
-                $set: {
-                    type: "like",
-                    t_user_id: req.query.t_user_id,
-                    r_user_id: req.query.r_user_id,
-                    refid: req.query.idcam,
-                    time: now
-                }
-            },
-            {
-                upsert: true, new: true
-            }
-        )
+        const now = dayjs()
 
+        const dbLike = await Like.findOneAndUpdate({
+            idcam: req.query.idcam,
+            user_id: req.query.t_user_id,
+        }, {
+            idcam: req.query.idcam,
+            user_id: req.query.t_user_id,
+            time: now
+        }, {
+            upsert: true, new: true
+        })
+        const countLike = await Like.count({ idcam: req.query.idcam })
+        const dbCamera = await Camera.findOneAndUpdate({ _id: req.query.idcam }, { $set: { like: countLike } })
+
+
+        /*
+                const dbNotification = await Notification.findOneAndUpdate(
+                    {
+                        type: "like",
+                        t_user_id: req.query.t_user_id,
+                        r_user_id: req.query.r_user_id,
+                        refid: req.query.idcam
+                    },
+                    {
+                        $set: {
+                            type: "like",
+                            t_user_id: req.query.t_user_id,
+                            r_user_id: req.query.r_user_id,
+                            refid: req.query.idcam,
+                            time: now
+                        }
+                    },
+                    {
+                        upsert: true, new: true
+                    }
+                )
+        
+                */
     } catch (error) {
 
     }
+
     res.end()
 });
 router.get('/unlike', async (req, res) => {
-    console.log(req.query);
-    const dbUser = await User.findOne({ user_id: req.query.t_user_id })
-    let l = false
-    try {
-        const dbUser = await User.findOneAndUpdate(
-            { user_id: req.query.t_user_id },
-            { $pull: { like: req.query.idcam } })
-        const dbCamera = await Camera.findById(req.query.idcam)
-        const dbCameraSave = await Camera.findByIdAndUpdate(
-            req.query.idcam,
-            { $set: { like: dbCamera.like - 1 } }
-        )
-
-    } catch (error) {
-
-    }
+    const dbLike = await Like.findOneAndDelete({ user_id: req.query.t_user_id, idcam: req.query.idcam })
+    const countLike = await Like.count({ idcam: req.query.idcam })
+    const dbCamera = await Camera.findOneAndUpdate({ _id: req.query.idcam }, { $set: { like: countLike } })
     res.end()
 });
 
@@ -522,110 +522,77 @@ router.get('/get_comment', async (req, res) => {
 });
 
 
+router.get('/user', async (req, res) => {
+    const dbUser = await User.findOne({ user_id: req.query.f_user_id })
+    const dbCamera = await Camera.find({ user_id: req.query.user_id, status: true })
+
+    const dbLikeUser = await Likeuser.findOne({ user_id: req.query.user_id, l_user_id: req.query.f_user_id })
+    const dbFollowing = await Following.findOne({ user_id: req.query.user_id, f_user_id: req.query.f_user_id })
+
+    console.log(req.query);
+    const myobj = {
+        user: dbUser,
+        camera: dbCamera,
+        sf: dbFollowing != null ? true : false,
+        sl: dbLikeUser != null ? true : false
+    }
+
+    res.send(myobj)
+});
+
+
 
 router.get('/add_follow', async (req, res) => {
     const now = dayjs()
-    const dbUser = await User.findOneAndUpdate(
-        { user_id: req.query.user_id },
-        { $push: { following: req.query.userID } }
-    )
-    const dbUser2 = await User.findOneAndUpdate(
-        { user_id: req.query.userID },
-        { $push: { followers: req.query.user_id } }
-    )
-    const dbNotification = await Notification.findOneAndUpdate(
-        {
-            type: "follow",
-            t_user_id: req.query.user_id,
-            r_user_id: req.query.userID,
-        },
+    const dbUser = await User.findOneAndUpdate({ user_id: req.query.userID }, {
+        $inc: { followers: + 1 }
+    })
+    const dbFollowing = await Following.findOneAndUpdate(
+        { user_id: req.query.user_id, f_user_id: req.query.userID },
         {
             $set: {
-                type: "follow",
-                t_user_id: req.query.user_id,
-                r_user_id: req.query.userID,
-                time: now
+                user_id: req.query.user_id,
+                f_user_id: req.query.userID,
+                name: dbUser.name,
+                time: now,
             }
-        },
-        {
-            upsert: true, new: true
-        }
+        }, { upsert: true, new: true }
     )
     res.end()
 });
 
 
 router.get('/un_follow', async (req, res) => {
-    console.log("unU");
-    const dbUser = await User.findOne({ user_id: req.query.user_id, })
-    let newArr = []
-    for (let index = 0; index < dbUser.following.length; index++) {
-        const element = dbUser.following[index];
-        if (element != req.query.userID) {
-            newArr[index] = element
-        }
-    }
-    const dbUserNew = await User.findOneAndUpdate(
-        { user_id: req.query.user_id },
-        { $set: { following: newArr } }
-    )
-
-    const dbUser2 = await User.findOne({ user_id: req.query.userID, })
-    let newArr2 = []
-    for (let index = 0; index < dbUser2.followers.length; index++) {
-        const element = dbUser2.followers[index];
-        if (element != req.query.user_id) {
-            newArr2[index] = element
-        }
-    }
-    const dbUserNew2 = await User.findOneAndUpdate(
-        { user_id: req.query.userID },
-        { $set: { followers: newArr2 } }
-    )
+    const dbFollowing = await Following.deleteOne({ user_id: req.query.user_id, f_user_id: req.query.userID })
+    const dbUser = await User.findOneAndUpdate({ user_id: req.query.userID }, {
+        $inc: { followers: -1 }
+    })
     res.end()
 });
 
 router.get('/add_like', async (req, res) => {
-    console.log("add");
-    const dbUser = await User.findOneAndUpdate(
-        { user_id: req.query.user_id },
-        { $push: { like: req.query.userID } }
+    const now = dayjs()
+    const dbLikeuser = await Likeuser.findOneAndUpdate(
+        { user_id: req.query.user_id, l_user_id: req.query.userID },
+        {
+            $set: {
+                user_id: req.query.user_id,
+                l_user_id: req.query.userID,
+                time: now,
+            }
+        }, { upsert: true, new: true }
     )
-    const dbUser2 = await User.findOneAndUpdate(
-        { user_id: req.query.userID },
-        { $push: { likeme: req.query.user_id } }
-    )
+    const dbUser = await User.findOneAndUpdate({ user_id: req.query.userID }, {
+        $inc: { like: + 1 }
+    })
     res.end()
 });
 
 router.get('/un_like', async (req, res) => {
-
-    const dbUser = await User.findOne({ user_id: req.query.user_id, })
-    let newArr = []
-    for (let index = 0; index < dbUser.likeme.length; index++) {
-        const element = dbUser.likeme[index];
-        if (element != req.query.userID) {
-            newArr[index] = element
-        }
-    }
-    const dbUserNew = await User.findOneAndUpdate(
-        { user_id: req.query.user_id },
-        { $set: { like: newArr } }
-    )
-
-    const dbUser2 = await User.findOne({ user_id: req.query.userID, })
-    let newArr2 = []
-    for (let index = 0; index < dbUser2.likeme.length; index++) {
-        const element = dbUser2.likeme[index];
-        if (element != req.query.user_id) {
-            newArr2[index] = element
-        }
-    }
-    const dbUserNew2 = await User.findOneAndUpdate(
-        { user_id: req.query.userID },
-        { $set: { likeme: newArr2 } }
-    )
-
+    const dbLikeuser = await Likeuser.deleteOne({ user_id: req.query.user_id, l_user_id: req.query.userID })
+    const dbUser = await User.findOneAndUpdate({ user_id: req.query.userID }, {
+        $inc: { like: - 1 }
+    })
     res.end()
 });
 
@@ -779,8 +746,46 @@ router.post('/getnamecam', async (req, res) => {
     }
 });
 
-module.exports = router;
 
+const storageII = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, './public/imageVideo/')
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname)
+    }
+})
+const uploadII = multer({ storage: storageII })
+router.post('/imageVideo', uploadII.single('image'), async (req, res, next) => {
+
+    const file = req.file
+    if (!file) {
+        const error = new Error('Please upload a file')
+        error.httpStatusCode = 400
+        return next("hey error")
+    }
+    res.end()
+})
+
+
+
+router.get('/check_online', (req, res, next) => {
+    res.sendStatus(200)
+})
+
+router.get('/listS', async (req, res) => {
+    const dbCamera = await Camera.find({ status: true, title: { $regex: req.query.text } })
+    res.send(dbCamera)
+})
+
+router.post('/nocam', async (req, res, next) => {
+    const dbCamera = await Camera.findByIdAndUpdate(req.body.idcam, {
+        $set: { status: false, dID: "" }
+    })
+    res.send(dbCamera.dID)
+})
+
+module.exports = router;
 
 
 var http = require('http').createServer();
@@ -795,7 +800,15 @@ setInterval(() => {
     io.emit('2','test')
 }, 5000);
 */
+/*
 http.listen(3000, function () {
     console.log('listening on *:3000');
 });
+*/
+/*
+name()
+async function name() {
+    console.log(dbLike);
+}
 
+*/
