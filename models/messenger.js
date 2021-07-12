@@ -6,7 +6,8 @@ const Schema = mongoose.Schema
 const messengerSchema = new Schema({
   reference: String,
   data: Array,
-  time: String
+  time: String,
+  state: Boolean
 })
 const messengerModel = mongoose.model('messenger', messengerSchema)
 module.exports = messengerModel

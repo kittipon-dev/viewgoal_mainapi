@@ -16,15 +16,10 @@ const Following = require('../models/following')
 const Name = require('../models/name')
 const View = require('../models/view')
 
-
-const https = require('https');
 const dayjs = require('dayjs')
-
 const bcrypt = require('bcrypt')
-const path = require('path');
 const fs = require('fs')
 
-const axios = require('axios');
 
 mongoose.connect('mongodb://localhost:27017/viewgoal', {
     useCreateIndex: true,
@@ -38,8 +33,40 @@ const router = express.Router();
 const multer = require('multer')
 const { findOne } = require('../models/advertising')
 
-const ipDocker = "192.168.2.14"
+
+const ipDocker = "13.213.96.135"
 const portDocker = 4000
+
+const mqtt = require('mqtt')
+const ipmqtt = "13.213.86.241"
+const portmqtt = "1883"
+const client = mqtt.connect(`mqtt://${ipmqtt}:${portmqtt}`)
+
+client.on('connect', function () {
+    client.subscribe('main', function (err) {
+        if (!err) {
+            console.log("Mqtt Online");
+        }
+    })
+})
+client.on('message', function (topic, message) {
+    // message is Buffer
+    const mes = JSON.parse(message.toString())
+    if (mes.mode == 0) {
+        setStatusCam(mes.dID, false)
+    }
+})
+
+async function setStatusCam(dID, b) {
+    const dbCamera = await Camera.findOneAndUpdate({
+        dID: dID
+    }, {
+        $set: {
+            status: b
+        }
+    })
+}
+
 
 router.get('/', async function (req, res, next) {
     const dbAdvertising = await Advertising.find({})
@@ -85,7 +112,6 @@ const storage = multer.diskStorage({
 var upload = multer({ storage: storage })
 
 router.post('/newA', upload.single('avatar'), async function (req, res, next) {
-    console.log(req.body);
     const dbA = new Advertising({
         date: new Date(),
         ref: req.body.ref,
@@ -144,8 +170,12 @@ router.post('/login', async (req, res) => {
     }
 });
 
+router.get('/getmail', async (req, res) => {
+    const dbLoin = await Login.findOne({ user_id: req.query.user_id })
+    res.send(dbLoin.username)
+});
+
 router.post('/resetpass', async (req, res) => {
-    console.log(req.body);
     res.end()
 });
 
@@ -200,62 +230,52 @@ router.post('/addcamera', async (req, res) => {
     }
     const dbCamera = new Camera(myobj)
     await dbCamera.save()
-    console.log(dbCamera);
     fs.copyFileSync('./public/imageVideo/null.jpg', './public/imageVideo/' + dbCamera._id + '.jpg')
     res.end()
 });
 
 router.get('/startcam', async (req, res) => {
-    console.log(req.query);
     const dbCamera = await Camera.findById(req.query._id,)
-    var data = JSON.stringify({
+    let data = JSON.stringify({
+        "mode": 1,
         "idcamre": dbCamera._id,
         "rtsp": dbCamera.url
     });
-    var config = {
-        method: 'post',
-        url: `http://${ipDocker}:${portDocker}/add`,
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        data: data
-    };
-    if (dbCamera.dID == "" || dbCamera.dID == null) {
-        axios(config)
-            .then(async function (response) {
-                const myobj = JSON.parse(JSON.stringify(response.data))
-                const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { dID: myobj.dID, status: true } })
-            })
-            .catch(function (error) {
-
-            });
-    }
+    client.publish('server1', data)
     res.end()
 });
+
+router.post('/add_dID', async (req, res) => {
+    const dbCamera = await Camera.findByIdAndUpdate(req.body.idcam, {
+        $set: {
+            dID: req.body.dID
+        }
+    })
+    res.end()
+});
+router.post('/rm_dID', async (req, res) => {
+    const dbCamera = await Camera.findByIdAndUpdate(req.body.idcam, {
+        $set: {
+            dID: ""
+        }
+    })
+    res.send(dbCamera.dID)
+});
+
+
 router.get('/stopcam', async (req, res) => {
-    const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { status: false })
-    var config = {
-        method: 'get',
-        url: `http://${ipDocker}:${portDocker}/stop?idcamre=${dbCamera.dID}`,
-        headers: {}
-    };
-    if (dbCamera.dID != "") {
-        axios(config)
-            .then(async function (response) {
-                console.log(response.status);
-                if (response.status == 200) {
-                    const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { dID: "" } })
-                }
-            })
-            .catch(function (error) {
-
-            });
-    }
-
+    const dbCamera = await Camera.findByIdAndUpdate(req.query._id, { $set: { status: false } })
+    let data = JSON.stringify({
+        "mode": 0,
+        "idcamre": dbCamera._id,
+    });
+    client.publish('server1', data)
     res.end()
 });
+
 router.get('/removedcam', async (req, res) => {
     const dbCamera = await Camera.findByIdAndRemove(req.query._id)
+    const dbSave = await Save.deleteMany({ idcam: req.query._id })
     res.end()
 });
 
@@ -284,8 +304,6 @@ router.get('/me', async (req, res) => {
 
 
 router.post('/editprofile', async (req, res) => {
-    console.log(req.body);
-    console.log("Asd");
     const dbUser = await User.findOneAndUpdate({
         user_id: req.body.user_id
     }, {
@@ -308,7 +326,6 @@ const storageI = multer.diskStorage({
 })
 const uploadI = multer({ storage: storageI })
 router.post('/editprofile-upimg', uploadI.single('myFile'), async (req, res, next) => {
-    console.log("upimg");
     const file = req.file
     if (!file) {
         const error = new Error('Please upload a file')
@@ -323,16 +340,16 @@ router.post('/editprofile-upimg', uploadI.single('myFile'), async (req, res, nex
 router.get('/addfavorite', async (req, res) => {
     const now = dayjs()
     const dbCamera = await Camera.findById(req.query.idcam)
-    console.log(dbCamera);
-    console.log(req.query.idcam);
     const dbSave = await Save.findOneAndUpdate({
         idcam: req.query.idcam,
         user_id: req.query.user_id,
     }, {
-        idcam: req.query.idcam,
-        user_id: req.query.user_id,
-        title: dbCamera.title,
-        time: now
+        $set: {
+            idcam: req.query.idcam,
+            user_id: req.query.user_id,
+            title: dbCamera.title,
+            time: now
+        }
     }, {
         upsert: true, new: true
     })
@@ -370,9 +387,11 @@ router.get('/getplay', async (req, res) => {
             idcam: req.query._id,
             user_id: req.query.user_id
         }, {
-            idcam: req.query._id,
-            user_id: req.query.user_id,
-            time: now
+            $set: {
+                idcam: req.query._id,
+                user_id: req.query.user_id,
+                time: now
+            }
         }, {
             upsert: true, new: true
         })
@@ -394,9 +413,11 @@ router.get('/like', async (req, res) => {
             idcam: req.query.idcam,
             user_id: req.query.t_user_id,
         }, {
-            idcam: req.query.idcam,
-            user_id: req.query.t_user_id,
-            time: now
+            $set: {
+                idcam: req.query.idcam,
+                user_id: req.query.t_user_id,
+                time: now
+            }
         }, {
             upsert: true, new: true
         })
@@ -467,7 +488,6 @@ router.get('/get_point', async (req, res) => {
 });
 
 router.get('/use_point', async (req, res) => {
-    console.log(req.query);
     const dbAdvertising = await Advertising.findOne({ ref: req.query.ref })
     const dbUser = await User.findOneAndUpdate(
         { user_id: req.query.user_id },
@@ -481,7 +501,6 @@ router.get('/use_point', async (req, res) => {
 //-------------------  Comment
 
 router.post('/postcomment', async (req, res) => {
-    console.log(req.query);
     const now = dayjs()
     const myobj = {
         idcam: req.query.idcam,
@@ -529,7 +548,6 @@ router.get('/user', async (req, res) => {
     const dbLikeUser = await Likeuser.findOne({ user_id: req.query.user_id, l_user_id: req.query.f_user_id })
     const dbFollowing = await Following.findOne({ user_id: req.query.user_id, f_user_id: req.query.f_user_id })
 
-    console.log(req.query);
     const myobj = {
         user: dbUser,
         camera: dbCamera,
@@ -757,7 +775,13 @@ const storageII = multer.diskStorage({
 })
 const uploadII = multer({ storage: storageII })
 router.post('/imageVideo', uploadII.single('image'), async (req, res, next) => {
-
+    const str = req.file.filename
+    const words = str.split('.jpg');
+    const dbCamera = await Camera.findByIdAndUpdate(words[0], {
+        $set: {
+            status: true
+        }
+    })
     const file = req.file
     if (!file) {
         const error = new Error('Please upload a file')
@@ -785,15 +809,51 @@ router.post('/nocam', async (req, res, next) => {
     res.send(dbCamera.dID)
 })
 
-module.exports = router;
 
+/*
 
-var http = require('http').createServer();
-var io = require('socket.io')(http);
+const httpServer = require("http").createServer(express);
+const options = { 
+    
+};
+const io = require("socket.io")(httpServer, options);
 
-io.on('connection', function (socket) {
+io.on("connection", socket => { 
+
+    socket.on('msg', msg => {
+
+        console.log(msg);
+
+    });
 
 });
+
+httpServer.listen(3000);
+*/
+
+
+module.exports = router;
+
+/*
+const server = require('../bin/www')
+
+const io = require("socket.io")(server, {
+    serveClient: false,
+});
+
+io.on("connection", socket => {
+
+
+    console.log(socket.id);
+
+    // Listen for chatMessage
+    socket.on('chatMessage', msg => {
+       
+
+    });
+
+});
+*/
 
 /*
 setInterval(() => {
@@ -805,10 +865,5 @@ http.listen(3000, function () {
     console.log('listening on *:3000');
 });
 */
-/*
-name()
-async function name() {
-    console.log(dbLike);
-}
 
-*/
+

@@ -88,3 +88,12 @@ function onListening() {
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
 }
+
+//const server = require('../bin/www')
+
+
+
+/*
+module.exports = server;
+require('../chat')
+*/
